@@ -1,0 +1,35 @@
+FROM python:3.8-slim-buster
+
+# Airflow
+ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
+ENV AIRFLOW_PROJECT_CFG=/src/airflow
+
+# pipx & poetry
+ENV PATH="/root/.local/bin:$PATH"
+ENV PATH="/root/.local/pipx/venvs/poetry/bin/:$PATH"
+
+# Install airflow dependencies
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update --assume-yes && apt-get upgrade --assume-yes
+RUN apt-get install -y --no-install-recommends freetds-bin krb5-user \
+        ldap-utils libffi6 libsasl2-dev libsasl2-2 libsasl2-modules \
+        libssl1.1 locales  lsb-release sasl2-bin sqlite3 unixodbc \
+        python3-dev gcc g++
+
+RUN apt-get install apt-file -y && apt-file update && apt-get install vim -y
+
+RUN apt install -y netcat
+
+# Setup pipx and poetry
+RUN pip install pipx
+RUN pipx install poetry==1.2.0
+RUN poetry config virtualenvs.create false
+
+# Copy files
+COPY pyproject.toml poetry.lock /src/
+WORKDIR /src
+RUN poetry install --no-interaction --no-root
+COPY . /src
+RUN poetry install --no-interaction
+
+EXPOSE 80 5000 8080

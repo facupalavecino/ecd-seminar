@@ -1,0 +1,132 @@
+version: '3'
+
+services:
+
+    airflow-database:
+        image: postgres:10.5
+        environment:
+            POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
+            POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
+            POSTGRES_DB: airflow
+            POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+            TZ: UTC
+        restart: always
+        volumes:
+            - ./docker/data/airflow/database:/var/lib/postgresql/data/
+        healthcheck:
+            test: ["CMD-SHELL", "sh -c 'pg_isready -U ${AIRFLOW_POSTGRES_USER} -d airflow'"]
+            interval: 10s
+            timeout: 3s
+            retries: 3
+        networks:
+            - ecd-seminar
+
+    airflow-webserver:
+        build: 
+            context: .
+            dockerfile: Dockerfile.airflow
+        restart: always
+        depends_on:
+            - airflow-database
+            
+        environment:
+            POSTGRES_HOST: airflow-database
+            POSTGRES_PORT: 5432
+            POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
+            POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
+            POSTGRES_DB: airflow
+            AIRFLOW__CORE__EXECUTOR: LocalExecutor
+            AIRFLOW__CORE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-database:5432/airflow"
+            AIRFLOW__CORE__BASE_LOG_FOLDER: /etc/airflow/logs
+            AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+            AIRFLOW__WEBSERVER__WORKERS: 2
+            AIRFLOW__CORE__ENABLE_XCOM_PICKLING: "true"
+            TZ: UTC
+            _AIRFLOW_WWW_USER_CREATE: 'true'
+        ports:
+            - 0.0.0.0:8090:8080
+        command: bash -c "docker/wait-for airflow-database:5432 -- poetry run airflow db init \
+                && poetry run airflow users create --username ${_AIRFLOW_WWW_USER_USERNAME} -p ${_AIRFLOW_WWW_USER_PASSWORD} --firstname Admin --lastname admin --role Admin --email admin@example.org \ 
+                && poetry run airflow webserver"
+        healthcheck:
+            test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+            interval: 60s
+            timeout: 30s
+            retries: 3
+        volumes:
+            - ./docker/data/airflow/webserver/tasks:/etc/airflow/tasks
+            - ./docker/data/airflow/webserver/logs:/etc/airflow/logs
+        networks:
+            - ecd-seminar
+
+    airflow-scheduler:
+        build: 
+            context: .
+            dockerfile: Dockerfile.airflow
+        restart: always
+        depends_on:
+            - airflow-database
+        environment:
+            POSTGRES_PORT: 5432
+            POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
+            POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
+            WEBSERVER_HOST: airflow-webserver
+            WEBSERVER_PORT: 8080
+            POSTGRES_DB: airflow
+            AIRFLOW__CORE__EXECUTOR: LocalExecutor
+            AIRFLOW__CORE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-database:5432/airflow"
+            AIRFLOW__CORE__BASE_LOG_FOLDER: /etc/airflow/logs
+            AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
+            TZ: UTC
+        command: bash -c "docker/wait-for airflow-database:5432 -- poetry run airflow scheduler"
+        volumes:
+            - ./docker/data/airflow/webserver/tasks:/etc/airflow/tasks
+            - ./docker/data/airflow/webserver/logs:/etc/airflow/logs
+        networks:
+            - ecd-seminar
+
+    spark-master:
+        container_name: spark-master
+        build: 
+            context: .
+            dockerfile: Dockerfile.spark-master
+        restart: always
+        ports:
+            - 4040:4040
+            - 6066:6066
+            - 7077:7077
+            - 8080:8080
+        networks:
+            - ecd-seminar
+    
+    spark-worker-1:
+        container_name: spark-worker-1
+        build: 
+            context: .
+            dockerfile: Dockerfile.spark-worker
+        restart: always
+        ports:
+            - 4041:4040
+            - "6066"
+            - "7077"
+            - 8081:8080
+        networks:
+            - ecd-seminar
+    
+    spark-worker-2:
+        container_name: spark-worker-2
+        build:
+            context: .
+            dockerfile: Dockerfile.spark-worker
+        restart: always
+        ports:
+            - 4042:4040
+            - "6066"
+            - "7077"
+            - 8082:8080
+        networks:
+            - ecd-seminar
+
+networks:
+    ecd-seminar:
+        driver: bridge
