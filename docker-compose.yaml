@@ -1,8 +1,9 @@
-version: '3'
+version: '3.9'
 
 services:
 
     airflow-database:
+        container_name: ecd-seminar_airflow-database
         image: postgres:10.5
         environment:
             POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
@@ -22,6 +23,7 @@ services:
             - ecd-seminar
 
     airflow-webserver:
+        container_name: ecd-seminar_airflow-webserver
         build: 
             context: .
             dockerfile: Dockerfile.airflow
@@ -60,6 +62,7 @@ services:
             - ecd-seminar
 
     airflow-scheduler:
+        container_name: ecd-seminar_airflow-scheduler
         build: 
             context: .
             dockerfile: Dockerfile.airflow
@@ -76,7 +79,7 @@ services:
             AIRFLOW__CORE__EXECUTOR: LocalExecutor
             AIRFLOW__CORE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-database:5432/airflow"
             AIRFLOW__CORE__BASE_LOG_FOLDER: /etc/airflow/logs
-            AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
+            AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
             TZ: UTC
         command: bash -c "docker/wait-for airflow-database:5432 -- poetry run airflow scheduler"
         volumes:
@@ -86,7 +89,7 @@ services:
             - ecd-seminar
 
     spark-master:
-        container_name: spark-master
+        container_name: ecd-seminar_spark-master
         build: 
             context: .
             dockerfile: Dockerfile.spark-master
@@ -100,7 +103,7 @@ services:
             - ecd-seminar
     
     spark-worker-1:
-        container_name: spark-worker-1
+        container_name: ecd-seminar_spark-worker-1
         build: 
             context: .
             dockerfile: Dockerfile.spark-worker
@@ -114,7 +117,7 @@ services:
             - ecd-seminar
     
     spark-worker-2:
-        container_name: spark-worker-2
+        container_name: ecd-seminar_spark-worker-2
         build:
             context: .
             dockerfile: Dockerfile.spark-worker
@@ -126,6 +129,51 @@ services:
             - 8082:8080
         networks:
             - ecd-seminar
+    
+    redis:
+        container_name: ecd-seminar_redis
+        image: redis
+        restart: always
+        profiles: ["superset"]
+
+    superset-database:
+        container_name: ecd-seminar_superset-database
+        image: postgres:10.5
+        environment:
+            POSTGRES_USER: ${SUPERSET_POSTGRES_USER}
+            POSTGRES_PASSWORD: ${SUPERSET_POSTGRES_PASSWORD}
+            POSTGRES_DB: superset
+            POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+            TZ: UTC
+        restart: always
+        volumes:
+            - ./docker/data/superset/database:/var/lib/postgresql/data/
+        healthcheck:
+            test: ["CMD-SHELL", "sh -c 'pg_isready -U ${SUPERSET_POSTGRES_USER} -d superset'"]
+            interval: 10s
+            timeout: 3s
+            retries: 3
+        networks:
+            - ecd-seminar
+        profiles: ["superset"]
+
+    superset:
+        
+        image: apache/superset
+        container_name: ecd-seminar_superset
+        restart: always
+        depends_on:
+            - redis
+            - superset-database
+        environment:
+            SUPERSET_HOME: /etc/superset
+            SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+        ports:
+            - "8088:8088"
+        volumes:
+            - ./docker/superset/config/superset_config.py:/etc/superset/superset_config.py
+            - ./docker/superset/data:/var/lib/superset
+        profiles: ["superset"]
 
 networks:
     ecd-seminar:
