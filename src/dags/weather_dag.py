@@ -26,6 +26,17 @@ LOCATIONS: List[Tuple[str, str]] = [
 ]
 
 def check_city_coordinates(city_name: str, country: str):
+    """Checks if the geo coordinates of a city are stored in the database.
+
+    If yes, they are pushed through an XCom.
+
+    Parameters
+    ----------
+    city_name : str
+        Name of the city
+    country : str
+        Name of the country
+    """
     context = get_current_context()
 
     ti: TaskInstance = context["ti"]
@@ -52,6 +63,17 @@ def check_city_coordinates(city_name: str, country: str):
 
 
 def get_city_coordinates_from_api(city_name: str, country: str):
+    """Requests the geo coordinates of a city from the API.
+
+    The result is pushed through an XCom.
+
+    Parameters
+    ----------
+    city_name : str
+        Name of the city
+    country : str
+        Name of the country
+    """
     context = get_current_context()
 
     ti: TaskInstance = context["ti"]
@@ -68,6 +90,15 @@ def get_city_coordinates_from_api(city_name: str, country: str):
 
 
 def get_city_weather_from_api(city_name: str, country: str):
+    """Requests the current weather of a city from the API.
+
+    Parameters
+    ----------
+    city_name : str
+        Name of the city
+    country : str
+        Name of the country
+    """
     context = get_current_context()
 
     ti: TaskInstance = context["ti"]

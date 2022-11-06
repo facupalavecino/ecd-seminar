@@ -11,7 +11,20 @@ from src.database.helpers import save_city_coordinates_in_db
 
 
 def get_city_coordinates(city_name: str, country: str):
+    """Makes an HTTP request to get the geo coordinates of a city
+    and saves the result in the database
 
+    Parameters
+    ----------
+    city_name : str
+        Name of the city
+    country : str
+        Name of the country
+
+    Returns
+    -------
+    A tuple describing (city_id, latitude, longitude)
+    """
     r = requests.get(
         url=OPEN_WEATHER_BASE_URL + "/geo/1.0/direct",
         params={
@@ -38,6 +51,20 @@ def get_city_coordinates(city_name: str, country: str):
 
 
 def get_city_weather(city_id: int, lat: float, lon: float, logical_date: datetime):
+    """Makes an HTTP request to get a city's current weather 
+    and saves the result in the database
+
+    Parameters
+    ----------
+    city_id : int
+        ID of the city in the database
+    lat: float
+        City's latitude
+    lon : float
+        City's longitude
+    logical_date: datetime
+        Current timestamp when weather is requested
+    """
 
     r = requests.get(
         url=OPEN_WEATHER_BASE_URL + "/data/2.5/weather",
