@@ -131,3 +131,7 @@ dmypy.json
 docker/data
 
 .env
+
+src/webserver_config.py
+
+.vscode/
