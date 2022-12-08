@@ -21,6 +21,28 @@ services:
             retries: 3
         networks:
             - ecd-seminar
+    
+    weather-database:
+        container_name: ecd-seminar_weather-database
+        image: postgres:10.5
+        environment:
+            POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
+            POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
+            POSTGRES_DB: weather
+            POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+            TZ: UTC
+        restart: always
+        ports:
+            - 5433:5432
+        volumes:
+            - ./docker/data/weather/database:/var/lib/postgresql/data/
+        healthcheck:
+            test: ["CMD-SHELL", "sh -c 'pg_isready -U ${AIRFLOW_POSTGRES_USER} -d airflow'"]
+            interval: 10s
+            timeout: 3s
+            retries: 3
+        networks:
+            - ecd-seminar
 
     airflow-webserver:
         container_name: ecd-seminar_airflow-webserver
@@ -30,6 +52,7 @@ services:
         restart: always
         depends_on:
             - airflow-database
+            - weather-database
             
         environment:
             POSTGRES_HOST: airflow-database
@@ -80,11 +103,16 @@ services:
             AIRFLOW__CORE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-database:5432/airflow"
             AIRFLOW__CORE__BASE_LOG_FOLDER: /etc/airflow/logs
             AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+            AIRFLOW_CONN_WEATHER_POSTGRES: "postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@weather-database:5432/weather"
+            OPEN_METEO_BASE_URL: ${OPEN_METEO_BASE_URL}
+            OPEN_METEO_HISTORY_URL: ${OPEN_METEO_HISTORY_URL}
+            OPEN_METEO_GEOCODING_URL: ${OPEN_METEO_GEOCODING_URL}
             TZ: UTC
         command: bash -c "docker/wait-for airflow-database:5432 -- poetry run airflow scheduler"
         volumes:
             - ./docker/data/airflow/webserver/tasks:/etc/airflow/tasks
             - ./docker/data/airflow/webserver/logs:/etc/airflow/logs
+            - ./src:/ecd-intensive-seminar/src
         networks:
             - ecd-seminar
 
