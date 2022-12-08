@@ -130,6 +130,7 @@ dmypy.json
 
 docker/data
 
+<<<<<<< feature/setup-docker-services
 .env
 
 src/webserver_config.py
@@ -137,3 +138,6 @@ src/webserver_config.py
 .vscode/
 
 src/logs/
+=======
+.env
+>>>>>>> main

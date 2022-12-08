@@ -1,11 +1,21 @@
 FROM python:3.8-slim-buster
 
 ENV AIRFLOW__CORE__LOAD_EXAMPLES=False
+<<<<<<< feature/setup-docker-services
 
 ENV POETRY_HOME=/etc/poetry
 ENV POETRY_VERSION=1.2.0
 
 RUN apt-get update --assume-yes && apt-get install -y curl libpq-dev gcc netcat
+=======
+ENV POETRY_HOME=/etc/poetry
+ENV POETRY_VERSION=1.2.0
+
+RUN apt-get update --assume-yes && apt-get install -y curl
+
+# Airflow dependencies
+RUN apt-get install -y gcc netcat
+>>>>>>> main
 
 RUN curl -sSL https://install.python-poetry.org | python3 - --version ${POETRY_VERSION}
 
@@ -13,6 +23,7 @@ ENV PATH="$POETRY_HOME/bin:$PATH"
 
 RUN poetry config virtualenvs.create false
 
+<<<<<<< feature/setup-docker-services
 COPY pyproject.toml poetry.lock /ecd-intensive-seminar/
 
 WORKDIR /ecd-intensive-seminar
@@ -27,4 +38,16 @@ RUN poetry install --no-interaction
 
 ENV AIRFLOW_HOME=/ecd-intensive-seminar/src
 
+=======
+COPY pyproject.toml poetry.lock /src/
+
+WORKDIR /src
+
+RUN poetry install --no-interaction --no-root
+
+COPY . /src
+
+RUN poetry install --no-interaction
+
+>>>>>>> main
 EXPOSE 80 8080
