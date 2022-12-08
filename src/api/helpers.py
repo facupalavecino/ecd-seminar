@@ -1,20 +1,18 @@
-import json
 import logging
-import pytz
-import requests
-
 from collections import namedtuple
 from datetime import datetime, timedelta
 
+import pytz
+import requests
+
 from src.cfg import (
     HOURLY_MEASUREMENTS,
-    OPEN_METEO_BASE_URL,
     OPEN_METEO_GEOCODING_URL,
-    OPEN_METEO_HISTORY_URL
+    OPEN_METEO_HISTORY_URL,
 )
 from src.database.helpers import (
     save_city_coordinates_in_db,
-    save_weather_measurement_in_db
+    save_weather_measurement_in_db,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,10 +35,11 @@ def get_city_coordinates(city_name: str, country: str):
     """
     r = requests.get(
         url=OPEN_METEO_GEOCODING_URL + "/v1/search",
-        params={
+        params={  # type:ignore
             "name": city_name,
             "count": 1,
-        }
+        },
+        timeout=60,
     )
 
     r.raise_for_status()
@@ -61,7 +60,7 @@ def get_city_coordinates(city_name: str, country: str):
 
 
 def get_city_weather(city_id: int, lat: float, lon: float, logical_date: datetime):
-    """Makes an HTTP request to get a city's historical weather 
+    """Makes an HTTP request to get a city's historical weather
     and saves the result in the database
 
     Parameters
@@ -85,16 +84,20 @@ def get_city_weather(city_id: int, lat: float, lon: float, logical_date: datetim
     params = {
         "latitude": lat,
         "longitude": lon,
-        "start_date": logical_date.strftime('%Y-%m-%d'),
-        "end_date": logical_date.strftime('%Y-%m-%d'),
+        "start_date": logical_date.strftime("%Y-%m-%d"),
+        "end_date": logical_date.strftime("%Y-%m-%d"),
         "hourly": ",".join(HOURLY_MEASUREMENTS),
     }
 
-    params_str = "&".join("%s=%s" % (k,v) for k,v in params.items())
+    params_str = ""
+
+    for key, val in params.items():
+        params_str = params_str + f"{key}={val}&"
+
+    params_str = params_str[:-1]  # Discard last &
 
     r = requests.get(
-        url=OPEN_METEO_HISTORY_URL + "/v1/era5",
-        params=params_str
+        url=OPEN_METEO_HISTORY_URL + "/v1/era5", params=params_str, timeout=60
     )
 
     r.raise_for_status()
@@ -105,7 +108,7 @@ def get_city_weather(city_id: int, lat: float, lon: float, logical_date: datetim
 
     keys = ["time"] + HOURLY_MEASUREMENTS
 
-    t = namedtuple("WeatherData", ["time"] + HOURLY_MEASUREMENTS)
+    t = namedtuple("WeatherData", ["time"] + HOURLY_MEASUREMENTS)  # type: ignore
 
     measurements = list(map(t, *[hourly[k] for k in keys]))
 
@@ -113,3 +116,5 @@ def get_city_weather(city_id: int, lat: float, lon: float, logical_date: datetim
         city_id=city_id,
         measurements=measurements,
     )
+
+    return None

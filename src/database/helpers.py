@@ -1,8 +1,7 @@
-from datetime import datetime
-from typing import Any, List, Tuple
+from typing import Any, List
 
 from airflow.hooks.postgres_hook import PostgresHook
-from jinja2 import Template
+from jinja2 import Template  # type: ignore
 
 from src.cfg import POSTGRES_CONN_ID, SQL_QUERIES_DIR
 
@@ -23,15 +22,10 @@ def get_city_coordinates_from_db(city_name: str, country: str) -> Any:
     """
     pg_hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
 
-    with open(SQL_QUERIES_DIR / "get_city_coordinates.sql", "r") as f:
+    with open(SQL_QUERIES_DIR / "get_city_coordinates.sql", "r", encoding="utf-8") as f:
         template = Template(f.read())
 
-    query = template.render(
-        {
-            "city_name": city_name,
-            "country": country
-        }
-    )
+    query = template.render({"city_name": city_name, "country": country})
 
     return pg_hook.get_records(sql=query)
 
@@ -61,21 +55,18 @@ def save_city_coordinates_in_db(
     """
     pg_hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
 
-    with open(SQL_QUERIES_DIR / "insert_city_coordinates.sql", "r") as f:
+    with open(
+        SQL_QUERIES_DIR / "insert_city_coordinates.sql", "r", encoding="utf-8"
+    ) as f:
         template = Template(f.read())
 
     query = template.render(
-        {
-            "city_name": city_name,
-            "country": country,
-            "lat": lat,
-            "lon": lon
-        }
+        {"city_name": city_name, "country": country, "lat": lat, "lon": lon}
     )
 
     with pg_hook.get_conn() as conn:
         with conn.cursor() as cursor:
-            result = cursor.execute(query)
+            cursor.execute(query)
             idx = cursor.fetchone()[0]
 
     return idx
@@ -83,13 +74,22 @@ def save_city_coordinates_in_db(
 
 def save_weather_measurement_in_db(
     city_id: int,
-    measurements: List[Tuple[str, float, float, float, float]],
+    measurements: List[Any],
 ):
-    """
+    """Saves the hourly weather measurements of a city in the database
+
+    Parameters
+    ----------
+    city_id : int
+        ID of the city
+    measurements : List[Any]
+        Tuple containing several weather measurements for each hour for the city
     """
     pg_hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
 
-    with open(SQL_QUERIES_DIR / "insert_weather_measurement.sql", "r") as f:
+    with open(
+        SQL_QUERIES_DIR / "insert_weather_measurement.sql", "r", encoding="utf-8"
+    ) as f:
         template = Template(f.read())
 
     query = template.render(
@@ -101,6 +101,4 @@ def save_weather_measurement_in_db(
 
     with pg_hook.get_conn() as conn:
         with conn.cursor() as cursor:
-            result = cursor.execute(query)
-
-    return result
+            cursor.execute(query)
