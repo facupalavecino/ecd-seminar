@@ -1,4 +1,5 @@
-from typing import Any
+from datetime import datetime
+from typing import Any, List, Tuple
 
 from airflow.hooks.postgres_hook import PostgresHook
 from jinja2 import Template
@@ -40,7 +41,7 @@ def save_city_coordinates_in_db(
     country: str,
     lat: float,
     lon: float,
-):
+) -> int:
     """Saves the geo coordinates of a city in the database
 
     Parameters
@@ -56,7 +57,7 @@ def save_city_coordinates_in_db(
 
     Returns
     -------
-    Operation result
+    int : The ID of the new or existing record
     """
     pg_hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
 
@@ -69,6 +70,32 @@ def save_city_coordinates_in_db(
             "country": country,
             "lat": lat,
             "lon": lon
+        }
+    )
+
+    with pg_hook.get_conn() as conn:
+        with conn.cursor() as cursor:
+            result = cursor.execute(query)
+            idx = cursor.fetchone()[0]
+
+    return idx
+
+
+def save_weather_measurement_in_db(
+    city_id: int,
+    measurements: List[Tuple[str, float, float, float, float]],
+):
+    """
+    """
+    pg_hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
+
+    with open(SQL_QUERIES_DIR / "insert_weather_measurement.sql", "r") as f:
+        template = Template(f.read())
+
+    query = template.render(
+        {
+            "city_id": city_id,
+            "measurements": measurements,
         }
     )
 

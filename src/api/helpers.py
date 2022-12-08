@@ -1,13 +1,23 @@
 import json
+import logging
+import pytz
 import requests
 
-from datetime import datetime
+from collections import namedtuple
+from datetime import datetime, timedelta
 
 from src.cfg import (
-    OPEN_WEATHER_BASE_URL,
-    OPEN_WEATHER_API_KEY,
+    HOURLY_MEASUREMENTS,
+    OPEN_METEO_BASE_URL,
+    OPEN_METEO_GEOCODING_URL,
+    OPEN_METEO_HISTORY_URL
 )
-from src.database.helpers import save_city_coordinates_in_db
+from src.database.helpers import (
+    save_city_coordinates_in_db,
+    save_weather_measurement_in_db
+)
+
+logger = logging.getLogger(__name__)
 
 
 def get_city_coordinates(city_name: str, country: str):
@@ -26,32 +36,32 @@ def get_city_coordinates(city_name: str, country: str):
     A tuple describing (city_id, latitude, longitude)
     """
     r = requests.get(
-        url=OPEN_WEATHER_BASE_URL + "/geo/1.0/direct",
+        url=OPEN_METEO_GEOCODING_URL + "/v1/search",
         params={
-            "q": f"{city_name}, {country}",
-            "appid": OPEN_WEATHER_API_KEY
+            "name": city_name,
+            "count": 1,
         }
     )
 
     r.raise_for_status()
 
-    data = json.loads(r.content)[0]
+    response = r.json()
 
-    lat = data["lat"]
-    lon = data["lon"]
+    lat = response["results"][0]["latitude"]
+    lon = response["results"][0]["longitude"]
 
-    save_city_coordinates_in_db(
+    city_id = save_city_coordinates_in_db(
         city_name=city_name,
         country=country,
         lat=lat,
         lon=lon,
     )
 
-    return lat, lon
+    return city_id, lat, lon
 
 
 def get_city_weather(city_id: int, lat: float, lon: float, logical_date: datetime):
-    """Makes an HTTP request to get a city's current weather 
+    """Makes an HTTP request to get a city's historical weather 
     and saves the result in the database
 
     Parameters
@@ -65,50 +75,41 @@ def get_city_weather(city_id: int, lat: float, lon: float, logical_date: datetim
     logical_date: datetime
         Current timestamp when weather is requested
     """
+    utc = pytz.UTC
+
+    if logical_date > datetime.today().replace(tzinfo=utc) - timedelta(days=7):
+        logger.warning("Historical data is available up to 1 week ago")
+
+        return None
+
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "start_date": logical_date.strftime('%Y-%m-%d'),
+        "end_date": logical_date.strftime('%Y-%m-%d'),
+        "hourly": ",".join(HOURLY_MEASUREMENTS),
+    }
+
+    params_str = "&".join("%s=%s" % (k,v) for k,v in params.items())
 
     r = requests.get(
-        url=OPEN_WEATHER_BASE_URL + "/data/2.5/weather",
-        params={
-            "lat": lat,
-            "lon": lon,
-            "appid": OPEN_WEATHER_API_KEY
-        }
+        url=OPEN_METEO_HISTORY_URL + "/v1/era5",
+        params=params_str
     )
 
     r.raise_for_status()
 
-    data = r.json()
+    response = r.json()
 
-    temperature = data["main"]["temp"] - 273
-    feels_like = data["main"]["feels_like"] - 273
-    pressure = data["main"]["pressure"]
-    humidity = data["main"]["humidity"]
+    hourly = response["hourly"]
 
-    print(f"""
-        - Date: {logical_date}
-        - City ID: {city_id}
-        - Temp: {temperature}
-        - Feels Like: {feels_like}
-        - pressure: {pressure}
-        - humidity: {humidity}
-    """)
+    keys = ["time"] + HOURLY_MEASUREMENTS
 
-    # pg_hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
+    t = namedtuple("WeatherData", ["time"] + HOURLY_MEASUREMENTS)
 
-    # with open(SQL_QUERIES_DIR / "insert_city_coordinates.sql", "r") as f:
-    #     template = Template(f.read())
+    measurements = list(map(t, *[hourly[k] for k in keys]))
 
-    # query = template.render(
-    #     {
-    #         "city_name": city_name,
-    #         "country": country,
-    #         "lat": lat,
-    #         "lon": lon
-    #     }
-    # )
-
-    # with pg_hook.get_conn() as conn:
-    #     with conn.cursor() as cursor:
-    #         cursor.execute(query)
-
-    # return lat, lon
+    save_weather_measurement_in_db(
+        city_id=city_id,
+        measurements=measurements,
+    )

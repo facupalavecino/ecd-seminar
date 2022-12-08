@@ -135,3 +135,5 @@ docker/data
 src/webserver_config.py
 
 .vscode/
+
+src/logs/

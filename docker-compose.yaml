@@ -104,8 +104,9 @@ services:
             AIRFLOW__CORE__BASE_LOG_FOLDER: /etc/airflow/logs
             AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
             AIRFLOW_CONN_WEATHER_POSTGRES: "postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@weather-database:5432/weather"
-            OPEN_WEATHER_BASE_URL: ${OPEN_WEATHER_BASE_URL}
-            OPEN_WEATHER_API_KEY: ${OPEN_WEATHER_API_KEY}
+            OPEN_METEO_BASE_URL: ${OPEN_METEO_BASE_URL}
+            OPEN_METEO_HISTORY_URL: ${OPEN_METEO_HISTORY_URL}
+            OPEN_METEO_GEOCODING_URL: ${OPEN_METEO_GEOCODING_URL}
             TZ: UTC
         command: bash -c "docker/wait-for airflow-database:5432 -- poetry run airflow scheduler"
         volumes:

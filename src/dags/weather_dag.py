@@ -23,6 +23,7 @@ LOCATIONS: List[Tuple[str, str]] = [
     ("Buenos Aires", "AR"),
     ("London", "GB"),
     ("Paris", "FR"),
+    ("Doha", "QA"),
 ]
 
 def check_city_coordinates(city_name: str, country: str):
@@ -39,6 +40,8 @@ def check_city_coordinates(city_name: str, country: str):
     """
     context = get_current_context()
 
+    logical_date: datetime = context["logical_date"]
+
     ti: TaskInstance = context["ti"]
 
     records = get_city_coordinates_from_db(
@@ -52,7 +55,7 @@ def check_city_coordinates(city_name: str, country: str):
         lon = float(records[0][2])
 
         ti.xcom_push(
-            key=f"{city_name}_{country}_coordinates",
+            key=f"{city_name}_{country}_coordinates_{logical_date.strftime('%Y-%m-%d')}",
             value=[city_id, lat, lon]
         )
 
@@ -76,21 +79,23 @@ def get_city_coordinates_from_api(city_name: str, country: str):
     """
     context = get_current_context()
 
+    logical_date: datetime = context["logical_date"]
+
     ti: TaskInstance = context["ti"]
 
-    lat, lon = get_city_coordinates(
+    city_id, lat, lon = get_city_coordinates(
         city_name=city_name,
         country=country
     )
 
     ti.xcom_push(
-        key=f"{city_name}_{country}_coordinates",
-        value=[lat, lon]
+        key=f"{city_name}_{country}_coordinates_{logical_date.strftime('%Y-%m-%d')}",
+        value=[city_id, lat, lon]
     )
 
 
 def get_city_weather_from_api(city_name: str, country: str):
-    """Requests the current weather of a city from the API.
+    """Requests the historical weather of a city from the API.
 
     Parameters
     ----------
@@ -101,30 +106,36 @@ def get_city_weather_from_api(city_name: str, country: str):
     """
     context = get_current_context()
 
-    ti: TaskInstance = context["ti"]
     logical_date: datetime = context["logical_date"]
+
+    ti: TaskInstance = context["ti"]
 
     coords = ti.xcom_pull(
         task_ids=[
             f"{city_name.replace(' ', '-')}_{country}.get_city_coordinates",
             f"{city_name.replace(' ', '-')}_{country}.check_coordinates",
         ],
-        key=f"{city_name}_{country}_coordinates"
+        key=f"{city_name}_{country}_coordinates_{logical_date.strftime('%Y-%m-%d')}"
     )
 
-    city_id, lat, lon = coords[1]
+    city_id, lat, lon = coords[0] or coords[1]
 
-    get_city_weather(city_id, lat, lon, logical_date)
+    get_city_weather(
+        city_id=city_id,
+        lat=lat,
+        lon=lon,
+        logical_date=logical_date - timedelta(days=7)
+    )
 
 
 with DAG(
     dag_id="current_weather",
-    description="Fetches the current weather for a series of cities around the world",
-    schedule_interval="@once", #timedelta(minutes=5),
-    start_date=datetime(2022, 10, 1, 0, 0, 0),
+    description="Fetches the hourly weather for a series of cities around the world",
+    schedule_interval="@daily",
+    start_date=datetime(2022, 11, 1, 0, 0, 0),
     catchup=True,
     max_active_runs=1,
-    dagrun_timeout=timedelta(minutes=4),
+    dagrun_timeout=timedelta(minutes=5),
 ) as dag:
 
     create_pet_table = PostgresOperator(
