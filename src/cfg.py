@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 
-
 POSTGRES_CONN_ID = "weather_postgres"
 
 OPEN_METEO_BASE_URL = os.environ["OPEN_METEO_BASE_URL"]

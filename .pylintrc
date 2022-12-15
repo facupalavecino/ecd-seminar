@@ -1,0 +1,9 @@
+[MESSAGES CONTROL]
+disable=
+    missing-module-docstring
+
+[FORMAT]
+max-line-length=88
+
+# Good variable names which should always be accepted, separated by a comma
+good-names=r,ti,f
