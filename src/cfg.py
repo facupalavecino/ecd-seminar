@@ -14,4 +14,8 @@ HOURLY_MEASUREMENTS = [
     "apparent_temperature",
     "surface_pressure",
     "relativehumidity_2m",
+    "rain",
+    "snowfall",
+    "cloudcover",
+    "shortwave_radiation",
 ]

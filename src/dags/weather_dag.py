@@ -16,11 +16,11 @@ from airflow.operators.python import (
 from airflow.utils.task_group import TaskGroup
 from airflow.utils.trigger_rule import TriggerRule
 
+path.extend(["/ecd-intensive-seminar", str(Path(__file__).parents[2])])
+
 from src.api.helpers import get_city_coordinates, get_city_weather
 from src.cfg import POSTGRES_CONN_ID
 from src.database.helpers import get_city_coordinates_from_db
-
-path.extend(["/ecd-intensive-seminar", str(Path(__file__).parents[2])])
 
 LOCATIONS: List[Tuple[str, str]] = [
     ("Buenos Aires", "AR"),
@@ -128,7 +128,7 @@ with DAG(
     dag_id="current_weather",
     description="Fetches the hourly weather for a series of cities around the world",
     schedule_interval="@daily",
-    start_date=datetime(2022, 11, 1, 0, 0, 0),
+    start_date=datetime(2022, 9, 1, 0, 0, 0),
     catchup=True,
     max_active_runs=1,
     dagrun_timeout=timedelta(minutes=5),
