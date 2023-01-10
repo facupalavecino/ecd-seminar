@@ -1,6 +1,5 @@
 [MESSAGES CONTROL]
-disable=
-    missing-module-docstring
+disable=missing-module-docstring,wrong-import-position
 
 [FORMAT]
 max-line-length=88
